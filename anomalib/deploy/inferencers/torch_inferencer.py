@@ -118,9 +118,11 @@ class TorchInferencer(Inferencer):
             Tensor: pre-processed image.
         """
         transform_config = (
-            self.config.dataset.transform_config.val if "transform_config" in self.config.dataset.keys() else None
+            self.config.data.init_args.transform_config.val
+            if "transform_config" in self.config.data.init_args.keys()
+            else None
         )
-        image_size = tuple(self.config.dataset.image_size)
+        image_size = tuple(self.config.data.init_args.image_size)
         pre_processor = PreProcessor(transform_config, image_size)
         processed_image = pre_processor(image=image)["image"]
 
@@ -129,6 +131,7 @@ class TorchInferencer(Inferencer):
 
         return processed_image.to(self.device)
 
+    @torch.no_grad()
     def forward(self, image: Tensor) -> Tensor:
         """Forward-Pass input tensor to the model.
 

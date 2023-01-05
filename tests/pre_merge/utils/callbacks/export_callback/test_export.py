@@ -5,7 +5,7 @@ import pytest
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
-from anomalib.deploy import ExportMode
+from anomalib.deploy import ExportFormat
 from anomalib.utils.callbacks.export import ExportCallback
 from tests.helpers.config import get_test_configurable_parameters
 from tests.pre_merge.utils.callbacks.export_callback.dummy_lightning_model import (
@@ -15,10 +15,10 @@ from tests.pre_merge.utils.callbacks.export_callback.dummy_lightning_model impor
 
 
 @pytest.mark.parametrize(
-    "export_mode",
-    [ExportMode.OPENVINO, ExportMode.ONNX],
+    "export_format",
+    [ExportFormat.OPENVINO, ExportFormat.ONNX],
 )
-def test_export_model_callback(export_mode):
+def test_export_callback(export_format):
     """Tests if an optimized model is created."""
 
     config = get_test_configurable_parameters(
@@ -26,16 +26,16 @@ def test_export_model_callback(export_mode):
     )
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        config.project.path = tmp_dir
+        config.results_dir.path = tmp_dir
         model = DummyLightningModule(hparams=config)
         model.callbacks = [
             ExportCallback(
-                input_size=config.model.input_size,
+                input_size=config.data.init_args.image_size,
                 dirpath=os.path.join(tmp_dir),
                 filename="model",
-                export_mode=export_mode,
+                export_format=export_format,
             ),
-            EarlyStopping(monitor=config.model.metric),
+            EarlyStopping(monitor=config.model.init_args.metric),
         ]
         datamodule = FakeDataModule()
         trainer = pl.Trainer(
@@ -48,9 +48,9 @@ def test_export_model_callback(export_mode):
         )
         trainer.fit(model, datamodule=datamodule)
 
-        if export_mode == ExportMode.OPENVINO:
+        if export_format == ExportFormat.OPENVINO:
             assert os.path.exists(os.path.join(tmp_dir, "openvino/model.bin")), "Failed to generate OpenVINO model"
-        elif export_mode == ExportMode.ONNX:
+        elif export_format == ExportFormat.ONNX:
             assert os.path.exists(os.path.join(tmp_dir, "onnx/model.onnx")), "Failed to generate ONNX model"
         else:
-            raise ValueError(f"Unknown export_mode {export_mode}. Supported modes: onnx or openvino.")
+            raise ValueError(f"Unknown format {export_format}. Supported modes: onnx or openvino.")

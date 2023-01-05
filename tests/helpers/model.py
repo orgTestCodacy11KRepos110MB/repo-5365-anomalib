@@ -17,6 +17,7 @@ from anomalib.models import get_model
 from anomalib.models.components import AnomalyModule
 from anomalib.utils.callbacks import get_callbacks
 from anomalib.utils.callbacks.visualizer import BaseVisualizerCallback
+from anomalib.utils.cli.helpers import configure_optimizer
 
 
 def setup_model_train(
@@ -52,16 +53,17 @@ def setup_model_train(
         Tuple[DictConfig, LightningDataModule, AnomalyModule, Trainer]: config, datamodule, trained model, trainer
     """
     config = get_configurable_parameters(model_name=model_name)
+    config.results_dir.path = project_path
     if score_type is not None:
         config.model.score_type = score_type
-    config.project.seed = 42
-    config.dataset.category = category
-    config.dataset.path = dataset_path
-    config.project.log_images_to = []
+    config.seed_everything = 42
+    config.data.init_args.category = category
+    config.data.init_args.root = dataset_path
+    config.logging.logger = []
     config.trainer.devices = device
     config.trainer.accelerator = "gpu" if device != 0 else "cpu"
     if dataset_task is not None:
-        config.dataset.task = dataset_task
+        config.data.init_args.task = dataset_task
     if visualizer_mode is not None:
         config.visualization.mode = visualizer_mode
         config.visualization.save_images = True  # Enforce processing by Visualizer
@@ -79,12 +81,14 @@ def setup_model_train(
         config.ckpt_path = None
 
     # reassign project path as config is updated in `update_config_for_nncf`
-    config.project.path = project_path
+    config.trainer.default_root_dir = project_path
 
     datamodule = get_datamodule(config)
     model = get_model(config)
 
     callbacks = get_callbacks(config)
+
+    configure_optimizer(model, config)
 
     # Force model checkpoint to create checkpoint after first epoch
     if fast_run == True:
@@ -93,7 +97,7 @@ def setup_model_train(
                 callbacks.pop(index)
                 break
         model_checkpoint = ModelCheckpoint(
-            dirpath=os.path.join(config.project.path, "weights"),
+            dirpath=os.path.join(config.results_dir.path, "weights"),
             filename="last",
             monitor=None,
             mode="max",
@@ -127,7 +131,7 @@ def model_load_test(config: Union[DictConfig, ListConfig], datamodule: Lightning
 
     """
     loaded_model = get_model(config)  # get new model
-    ckpt_path = os.path.join(config.project.path, "weights/last.ckpt")
+    ckpt_path = os.path.join(config.results_dir.path, "weights/last.ckpt")
 
     callbacks = get_callbacks(config)
 
@@ -144,7 +148,7 @@ def model_load_test(config: Union[DictConfig, ListConfig], datamodule: Lightning
     assert np.isclose(
         results["image_AUROC"], new_results["image_AUROC"]
     ), f"Loaded model does not yield close performance results. {results['image_AUROC']} : {new_results['image_AUROC']}"
-    if config.dataset.task == "segmentation":
+    if config.data.init_args.task == "segmentation":
         assert np.isclose(
             results["pixel_AUROC"], new_results["pixel_AUROC"]
         ), "Loaded model does not yield close performance results"

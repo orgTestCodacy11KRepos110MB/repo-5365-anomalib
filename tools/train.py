@@ -18,6 +18,7 @@ from anomalib.config import get_configurable_parameters
 from anomalib.data import get_datamodule
 from anomalib.models import get_model
 from anomalib.utils.callbacks import get_callbacks
+from anomalib.utils.cli.helpers import configure_optimizer
 from anomalib.utils.loggers import configure_logger, get_experiment_logger
 
 logger = logging.getLogger("anomalib")
@@ -47,12 +48,16 @@ def train():
         warnings.filterwarnings("ignore")
 
     config = get_configurable_parameters(model_name=args.model, config_path=args.config)
-    if config.project.get("seed") is not None:
-        seed_everything(config.project.seed)
+    if config.seed_everything:
+        seed_everything(config.seed_everything)
 
     datamodule = get_datamodule(config)
     model = get_model(config)
+    # With the new config, optimizer is configured outside the model to make it  similar to LightningCLI
+    configure_optimizer(model, config)
     experiment_logger = get_experiment_logger(config)
+
+    # Set callbacks
     callbacks = get_callbacks(config)
 
     trainer = Trainer(**config.trainer, logger=experiment_logger, callbacks=callbacks)

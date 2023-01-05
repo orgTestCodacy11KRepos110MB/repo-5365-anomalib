@@ -3,6 +3,9 @@
 # anomalib fit --config ./config/model.patchcore.yaml
 ckpt_path: null
 seed_everything: null
+results_dir:
+  path: ./results
+  unique: false
 
 data:
   class_path: anomalib.data.MVTec
@@ -21,9 +24,6 @@ data:
 model:
   class_path: anomalib.models.Patchcore
   init_args:
-    input_size:
-      - 224 # Height
-      - 224 # Width
     backbone: wide_resnet50_2
     pre_trained: true
     layers:
@@ -33,8 +33,8 @@ model:
     num_neighbors: 9
 
 post_processing:
-  normalization_method: min_max # <null, min_max, cdf>
-  threshold_method: adaptive # options: [adaptive, manual]
+  normalization_method: MIN_MAX # <null, min_max, cdf>
+  threshold_method: ADAPTIVE # options: [adaptive, manual]
   manual_image_threshold: null
   manual_pixel_threshold: null
 
@@ -47,10 +47,12 @@ metrics:
     - AUROC
 
 visualization:
-  show_images: False # show images on the screen
-  save_images: True # save images to the file system
-  log_images: False # log images to the available loggers (if any)
-  mode: full # options: ["full", "simple"]
+  mode: full
+  image_save_path: null
+  inputs_are_normalized: true
+  show_images: false
+  log_images: false
+  save_images: true
 
 trainer:
   accelerator: auto # <"cpu", "gpu", "tpu", "ipu", "hpu", "auto">
